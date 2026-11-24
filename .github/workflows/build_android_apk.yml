@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: "3.29.3"      # 与 Windows 构建保持一致
+  FLUTTER_VERSION: "3.38.0"      # 与 Windows 构建保持一致
   APK_BUILD_DIR: "/tmp/build"
 
 jobs:
