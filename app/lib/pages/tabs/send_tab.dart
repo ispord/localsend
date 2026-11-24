@@ -25,7 +25,7 @@ class SendTab extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: const Color(0xFFEDEDED),
             elevation: 0.5,
-            title: const Text('微信傳檔', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
+            title: const Text('微信传档', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
             actions: [
               CustomIconButton(
                 onPressed: () async {
@@ -36,13 +36,13 @@ class SendTab extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline, color: Colors.black87),
-                onPressed: () async => vm.onTapAddress(context), // 手動輸入 IP 連線
+                onPressed: () async => vm.onTapAddress(context), // 动输入 IP 连线
               ),
             ],
           ),
           body: vm.nearbyDevices.isEmpty
               ? const Center(
-                  child: Text('正在搜尋附近設備...', style: TextStyle(color: Colors.grey)),
+                  child: Text('正在搜寻附近设备...', style: TextStyle(color: Colors.grey)),
                 )
               : ListView.separated(
                   itemCount: vm.nearbyDevices.length,
@@ -52,8 +52,8 @@ class SendTab extends StatelessWidget {
                     final deviceKey = device.fingerprint.isNotEmpty ? device.fingerprint : (device.ip ?? '');
                     final lastMsg = chatHistory[deviceKey]?.lastOrNull;
                     final subtitleText = lastMsg != null
-                        ? (lastMsg.fileName != null ? '[檔案] ${lastMsg.fileName}' : (lastMsg.text ?? ''))
-                        : '${device.deviceModel ?? '局域網設備'} (${device.ip})';
+                        ? (lastMsg.fileName != null ? '[文件] ${lastMsg.fileName}' : (lastMsg.text ?? ''))
+                        : '${device.deviceModel ?? '局域网设备'} (${device.ip})';
 
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -62,7 +62,7 @@ class SendTab extends StatelessWidget {
                         height: 48,
                         decoration: BoxDecoration(
                           color: const Color(0xFF07C160),
-                          borderRadius: BorderRadius.circular(6), // 微信經典微圓角方形頭像
+                          borderRadius: BorderRadius.circular(6), // 微信经典微圆角方形头像
                         ),
                         alignment: Alignment.center,
                         child: Text(
