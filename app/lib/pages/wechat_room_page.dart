@@ -276,7 +276,6 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
     );
   }
 }
-
 class _ChatImageBubble extends StatefulWidget {
   final Uint8List? imageBytes;
   final String? filePath;
@@ -289,107 +288,116 @@ class _ChatImageBubble extends StatefulWidget {
 }
 
 class _ChatImageBubbleState extends State<_ChatImageBubble> {
-  Timer? _timer;
-  bool _fileReady = false;
-  int _retryCount = 0;
+  Timer? pollTimer;
+  bool isFileReady = false;
+  int retryCount = 0;
 
-  @overridevoid initState() {
-super.initState();
-_checkFile();
-if (!_fileReady && widget.imageBytes == null && widget.filePath != null) {
-timer = Timer.periodic(const Duration(milliseconds: 500), () {
-_retryCount++;
-_checkFile();
-if (_fileReady || _retryCount > 40) {
-_timer?.cancel();
+  @override
+  void initState() {
+    super.initState();
+    checkFile();
+    if (!isFileReady && widget.imageBytes == null && widget.filePath != null) {
+      pollTimer = Timer.periodic(const Duration(milliseconds: 500), (t) {
+        retryCount++;
+        checkFile();
+        if (isFileReady || retryCount > 40) {
+          t.cancel();
+        }
+      });
+    }
+  }
+
+  void checkFile() {
+    if (widget.filePath != null) {
+      final f = File(widget.filePath!);
+      if (f.existsSync() && f.lengthSync() > 0) {
+        if (mounted) {
+          setState(() => isFileReady = true);
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    pollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.imageBytes != null) {
+      return GestureDetector(
+        onTap: () => widget.onTap(widget.imageBytes, null),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.memory(widget.imageBytes!, width: 180, fit: BoxFit.cover),
+        ),
+      );
+    }
+
+    if (isFileReady && widget.filePath != null) {
+      return GestureDetector(
+        onTap: () => widget.onTap(null, widget.filePath),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.file(
+            File(widget.filePath!),
+            width: 180,
+            fit: BoxFit.cover,
+            errorBuilder: (ctx, err, stack) {
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) setState(() {});
+              });
+              return buildPlaceholder();
+            },
+          ),
+        ),
+      );
+    }
+
+    return buildPlaceholder();
+  }
+
+  Widget buildPlaceholder() {
+    return Container(
+      width: 180,
+      height: 120,
+      decoration: BoxDecoration(
+        color: Colors.black12,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      alignment: Alignment.center,
+      child: const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF07C160)),
+      ),
+    );
+  }
 }
-});
-}
-}
-void _checkFile() {
-if (widget.filePath != null) {
-final f = File(widget.filePath!);
-if (f.existsSync() && f.lengthSync() > 0) {
-if (mounted) {
-setState(() => _fileReady = true);
-}
-}
-}
-}
-@override
-void dispose() {
-_timer?.cancel();
-super.dispose();
-}
-@override
-Widget build(BuildContext context) {
-if (widget.imageBytes != null) {
-return GestureDetector(
-onTap: () => widget.onTap(widget.imageBytes, null),
-child: ClipRRect(
-borderRadius: BorderRadius.circular(6),
-child: Image.memory(widget.imageBytes!, width: 180, fit: BoxFit.cover),
-),
-);
-}
-if (fileReady && widget.filePath != null) {
-return GestureDetector(
-onTap: () => widget.onTap(null, widget.filePath),
-child: ClipRRect(
-borderRadius: BorderRadius.circular(6),
-child: Image.file(
-File(widget.filePath!),
-width: 180,
-fit: BoxFit.cover,
-errorBuilder: (, _, _) {
-Future.delayed(const Duration(milliseconds: 500), () {
-if (mounted) setState(() {});
-});
-return _buildPlaceholder();
-},
-),
-),
-);
-}
-return _buildPlaceholder();
-}
-Widget _buildPlaceholder() {
-return Container(
-width: 180,
-height: 120,
-decoration: BoxDecoration(
-color: Colors.black12,
-borderRadius: BorderRadius.circular(6),
-),
-alignment: Alignment.center,
-child: const SizedBox(
-width: 24,
-height: 24,
-child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF07C160)),
-),
-);
-}
-}
+
 class _FullScreenImagePage extends StatelessWidget {
-final Uint8List? imageBytes;
-final String? filePath;
-const _FullScreenImagePage({this.imageBytes, this.filePath});
-@override
-Widget build(BuildContext context) {
-return Scaffold(
-backgroundColor: Colors.black,
-appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
-body: Center(
-child: InteractiveViewer(
-minScale: 0.5,
-maxScale: 5.0,
-child: imageBytes != null
-? Image.memory(imageBytes!, fit: BoxFit.contain)
-: Image.file(File(filePath!), fit: BoxFit.contain),
-),
-),
-);
-}
-}
+  final Uint8List? imageBytes;
+  final String? filePath;
 
+  const _FullScreenImagePage({this.imageBytes, this.filePath});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 5.0,
+          child: imageBytes != null
+              ? Image.memory(imageBytes!, fit: BoxFit.contain)
+              : Image.file(File(filePath!), fit: BoxFit.contain),
+        ),
+      ),
+    );
+  }
+}
 
