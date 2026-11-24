@@ -67,7 +67,21 @@ jobs:
         working-directory: ${{ env.APK_BUILD_DIR }}
         run: flutter pub get
 
-      # ================= 调试步骤开始 =================
+      # 👇 新增：修复第三方老包 device_apps 的 Gradle 兼容性问题 👇
+      - name: Patch device_apps gradle
+        run: |
+          DEVICE_APPS_DIR=$(find ~/.pub-cache/git -type d -name "device_apps-*" | head -n 1)
+          if [ -n "$DEVICE_APPS_DIR" ]; then
+            echo "Found device_apps at: $DEVICE_APPS_DIR"
+            # 1. 替换被废弃的 jcenter() 为 mavenCentral()
+            sed -i 's/jcenter()/mavenCentral()/g' "$DEVICE_APPS_DIR/android/build.gradle"
+            # 2. 在文件开头强制补上 com.android.library 插件
+            sed -i '1i apply plugin: "com.android.library"' "$DEVICE_APPS_DIR/android/build.gradle"
+          else
+            echo "device_apps not found!"
+          fi
+
+      # ================= 调试步骤 =================
       - name: Debug Android config
         working-directory: ${{ env.APK_BUILD_DIR }}/app/android
         run: |
@@ -75,7 +89,7 @@ jobs:
           cat settings.gradle
           echo "=========== GRADLE-WRAPPER.PROPERTIES ==========="
           cat gradle/wrapper/gradle-wrapper.properties
-      # ================= 调试步骤结束 =================
+      # ============================================
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
