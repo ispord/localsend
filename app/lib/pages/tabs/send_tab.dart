@@ -25,7 +25,7 @@ class SendTab extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: const Color(0xFFEDEDED),
             elevation: 0.5,
-            title: const Text('微信传档', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
+            title: const Text('文件传输', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
             actions: [
               CustomIconButton(
                 onPressed: () async {
@@ -36,7 +36,7 @@ class SendTab extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline, color: Colors.black87),
-                onPressed: () async => vm.onTapAddress(context), // 动输入 IP 连线
+                onPressed: () async => vm.onTapAddress(context), // 手动输入 IP 连线
               ),
             ],
           ),
