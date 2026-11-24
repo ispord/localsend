@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:localsend_app/pages/tabs/send_tab_vm.dart';
 import 'package:localsend_app/pages/wechat_room_page.dart';
@@ -45,9 +46,9 @@ class SendTab extends StatelessWidget {
                 )
               : ListView.separated(
                   itemCount: vm.nearbyDevices.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, indent: 72, color: Color(0xFFEDEDED)),
+                  separatorBuilder: (_, _) => const Divider(height: 1, indent: 72, color: Color(0xFFEDEDED)),
                   itemBuilder: (context, index) {
-                    final device = vm.nearbyDevices[index];
+                    final device = vm.nearbyDevices.elementAt(index);
                     final deviceKey = device.fingerprint.isNotEmpty ? device.fingerprint : (device.ip ?? '');
                     final lastMsg = chatHistory[deviceKey]?.lastOrNull;
                     final subtitleText = lastMsg != null
