@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:localsend_app/provider/chat_history_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/model/cross_file.dart';
 import 'package:localsend_app/model/send_mode.dart';
@@ -99,6 +100,23 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     // The ids are assigned upfront, so the checksums calculated below
     // can be mapped back to the corresponding file.
     final selectedFiles = files.map((file) => (id: _uuid.v4(), file: file)).toList();
+    // 寫入聊天氣泡紀錄（我發送的）
+    final deviceKey = target.fingerprint.isNotEmpty ? target.fingerprint : (target.ip ?? '');
+    for (final file in files) {
+      final isText = file.fileType == FileType.text && file.bytes != null;
+      ref.notifier(chatHistoryProvider).addMessage(
+        deviceKey,
+        ChatMessage(
+          id: _uuid.v4(),
+          isMe: true,
+          text: isText ? createMessagePreview(file.bytes) : null,
+          fileName: isText ? null : file.name,
+          filePath: file.path,
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+
 
     state = state.updateSession(
       sessionId: sessionId,
