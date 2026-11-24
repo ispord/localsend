@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:localsend_app/pages/wechat_room_page.dart';
 import 'package:localsend_app/provider/chat_history_provider.dart';
 import 'dart:async';
@@ -132,40 +133,25 @@ class ReceiveController {
           statuses: {for (final file in files.values) file.id: FileStatus.queue},
         );
 
-    bool quickSave = settings.quickSave && server.getState().session?.isMessageRequest != true;
+     bool quickSave = settings.quickSave && server.getState().session?.isMessageRequest != true;
     final quickSaveFromFavorites = settings.quickSaveFromFavorites && server.getState().session?.isMessageRequest != true;
     if (quickSaveFromFavorites && senderFavorite != null) {
       quickSave = true;
     }
     if (server.getState().webUpload && settings.receiveViaLinkAutoAccept && server.getState().session?.isMessageRequest != true) {
-      // The upload page (receive via link) is being served and requests should be accepted automatically.
       quickSave = true;
     }
-
-    if (quickSave) {
-      // 靜默接收檔案，不跳出 ProgressPage 遮擋聊天室
-      await acceptFileRequest({
-        for (final f in files.values) f.id: f.fileName,
-      });
-      return;
-    }
-
-
-      // accept all files
-      await acceptFileRequest({
-        for (final f in files.values) f.id: f.fileName,
-      });
-      return;
-    
 
     if (checkPlatformHasTray() && (await windowManager.isMinimized() || !(await windowManager.isVisible()) || !(await windowManager.isFocused()))) {
       await showFromTray();
     }
 
+    final sender = server.getState().session!.sender;
+    final deviceKey = sender.fingerprint.isNotEmpty ? sender.fingerprint : (sender.ip ?? '');
     final message = server.getState().session?.message;
-    if (message != null) {
-      final sender = server.getState().session!.sender;
-      final deviceKey = sender.fingerprint.isNotEmpty ? sender.fingerprint : (sender.ip ?? '');
+
+    // 1. 如果对方发来的是纯文本消息，直接写入微信聊天记录
+    if (message != null && message.isNotEmpty) {
       server.ref.notifier(chatHistoryProvider).addMessage(
         deviceKey,
         ChatMessage(
@@ -175,10 +161,38 @@ class ReceiveController {
           timestamp: DateTime.now(),
         ),
       );
-      // 直接接受並結束 session，不跳轉舊版 ReceivePage
-      await acceptFileRequest({});
-      return;
+      if (files.isEmpty) {
+        await acceptFileRequest({});
+        return;
+      }
     }
+
+    // 2. 自动静默接收所有非纯文本的文件/图片/视频，并写入微信聊天框显示缩略图
+    for (final f in files.values) {
+      if (f.fileType == FileType.text) continue; // 纯文本已在上面第 1 步写入气泡，跳过文件显示
+      final lower = f.fileName.toLowerCase();
+      final isVid = f.fileType == FileType.video || lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.avi') || lower.endsWith('.mkv') || lower.endsWith('.webm');
+      final savedPath = '$destinationDir${Platform.pathSeparator}${f.fileName}';
+
+      server.ref.notifier(chatHistoryProvider).addMessage(
+        deviceKey,
+        ChatMessage(
+          id: const Uuid().v4(),
+          isMe: false,
+          fileName: f.fileName,
+          filePath: savedPath,
+          isVideo: isVid,
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+
+    await acceptFileRequest({
+      for (final f in files.values) f.id: f.fileName,
+    });
+  }
+
+
 
 
     final receiveProvider = ViewProvider((ref) {
