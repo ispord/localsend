@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart' hide FileType;
 import 'package:flutter/material.dart';
 import 'package:localsend_app/model/cross_file.dart';
 import 'package:localsend_app/provider/chat_history_provider.dart';
@@ -31,6 +31,7 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
     _textController.clear();
 
     final bytes = Uint8List.fromList(utf8.encode(text));
+    final now = DateTime.now().toIso8601String();
     final textFile = CrossFile(
       name: '${const Uuid().v4()}.txt',
       fileType: FileType.text,
@@ -39,8 +40,8 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
       asset: null,
       path: null,
       bytes: bytes,
-      lastModified: DateTime.now(),
-      lastAccessed: DateTime.now(),
+      lastModified: now,
+      lastAccessed: now,
     );
 
     await context.ref.notifier(sendProvider).startSession(
@@ -52,9 +53,10 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   }
 
   Future<void> _pickAndSendFile() async {
-    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    final result = await FilePicker.pickFiles(allowMultiple: true);
     if (result == null || result.files.isEmpty) return;
 
+    final now = DateTime.now().toIso8601String();
     final crossFiles = result.files.map((f) {
       return CrossFile(
         name: f.name,
@@ -64,8 +66,8 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
         asset: null,
         path: f.path,
         bytes: f.bytes,
-        lastModified: DateTime.now(),
-        lastAccessed: DateTime.now(),
+        lastModified: now,
+        lastAccessed: now,
       );
     }).toList();
 
