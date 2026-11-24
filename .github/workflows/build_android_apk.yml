@@ -88,14 +88,21 @@ jobs:
 
           echo "Fixing wildcard '_' conflicts..."
           sed -i 's/(_, _)/(context, index)/g' lib/pages/tabs/send_tab.dart || true
-          # 修复 web_share_page 中的参数推断错误
           sed -i 's/onPopInvokedWithResult: (_, _)/onPopInvokedWithResult: (bool didPop, Object? result)/g' lib/pages/web_share_page.dart || true
           sed -i 's/(_, _, _)/(context, error, stackTrace)/g' lib/widget/file_thumbnail.dart || true
 
           echo "Fixing null-aware elements..."
-          # 使用 ! 强制断言，替代 if 判断，解决类型提升失败
           sed -i 's/?trailing/trailing!/g' lib/widget/list_tile/custom_list_tile.dart || true
           sed -i 's/?prefix/prefix!/g' lib/widget/copyable_text.dart || true
+
+      # 👇 补丁 3：修复 Rust 构建工具 cargokit 兼容 Gradle 9 的问题 👇
+      - name: Patch cargokit gradle
+        run: |
+          # 找到 cargokit 的 plugin.gradle 文件，将废弃的 project.exec 替换为 execOperations.exec
+          find ${{ env.APK_BUILD_DIR }} -type f -name "plugin.gradle" -path "*cargokit*" | while read file; do
+            echo "Patching $file"
+            sed -i 's/project.exec/execOperations.exec/g' "$file"
+          done
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
