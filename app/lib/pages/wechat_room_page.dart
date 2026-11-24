@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart' hide FileType;
 import 'package:flutter/material.dart';
@@ -41,18 +42,26 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
     if (text.isEmpty) return;
     _textController.clear();
 
-    context.ref.notifier(chatHistoryProvider).addMessage(
-      _deviceKey,
-      ChatMessage(id: const Uuid().v4(), isMe: true, text: text, timestamp: DateTime.now()),
+    final bytes = Uint8List.fromList(utf8.encode(text));
+    final now = DateTime.now().toIso8601String();
+    final textFile = CrossFile(
+      name: '${const Uuid().v4()}.txt',
+      fileType: FileType.text,
+      size: bytes.length,
+      thumbnail: null,
+      asset: null,
+      path: null,
+      bytes: bytes,
+      lastModified: now,
+      lastAccessed: now,
     );
-    _scrollToBottom();
 
     await context.ref.notifier(sendProvider).startSession(
       target: widget.device,
-      files: [],
-      message: text,
+      files: [textFile],
       background: true,
     );
+    _scrollToBottom();
   }
 
   Future<void> _pickAndSendFile() async {
@@ -60,26 +69,10 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
     if (result == null || result.files.isEmpty) return;
 
     final now = DateTime.now().toIso8601String();
-    final crossFiles = <CrossFile>[];
-
-    for (final f in result.files) {
+    final crossFiles = result.files.map((f) {
       final isImg = _isImage(f.name);
       final isVid = _isVideo(f.name);
-
-      context.ref.notifier(chatHistoryProvider).addMessage(
-        _deviceKey,
-        ChatMessage(
-          id: const Uuid().v4(),
-          isMe: true,
-          fileName: f.name,
-          filePath: f.path,
-          imageBytes: isImg ? f.bytes : null,
-          isVideo: isVid,
-          timestamp: DateTime.now(),
-        ),
-      );
-
-      crossFiles.add(CrossFile(
+      return CrossFile(
         name: f.name,
         fileType: isImg ? FileType.image : (isVid ? FileType.video : FileType.other),
         size: f.size,
@@ -89,16 +82,16 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
         bytes: f.bytes,
         lastModified: now,
         lastAccessed: now,
-      ));
-    }
+      );
+    }).toList();
 
-    _scrollToBottom();
     if (!mounted) return;
     await context.ref.notifier(sendProvider).startSession(
       target: widget.device,
       files: crossFiles,
       background: true,
     );
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
