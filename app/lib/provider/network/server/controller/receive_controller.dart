@@ -1,3 +1,5 @@
+import 'package:localsend_app/pages/wechat_room_page.dart';
+import 'package:localsend_app/provider/chat_history_provider.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:collection/collection.dart';
@@ -141,15 +143,13 @@ class ReceiveController {
     }
 
     if (quickSave) {
-      // Push before accepting: the permission request in [acceptFileRequest] may block for a while.
-      // ignore: use_build_context_synchronously, unawaited_futures
-      Routerino.context.pushImmediately(
-        () => ProgressPage(
-          showAppBar: false,
-          closeSessionOnClose: true,
-          sessionId: sessionId,
-        ),
-      );
+      // 靜默接收檔案，不跳出 ProgressPage 遮擋聊天室
+      await acceptFileRequest({
+        for (final f in files.values) f.id: f.fileName,
+      });
+      return;
+    }
+
 
       // accept all files
       await acceptFileRequest({
@@ -164,23 +164,22 @@ class ReceiveController {
 
     final message = server.getState().session?.message;
     if (message != null) {
-      // Message already received
-      await server.ref
-          .redux(receiveHistoryProvider)
-          .dispatchAsync(
-            AddHistoryEntryAction(
-              entryId: const Uuid().v4(),
-              fileName: message,
-              fileType: FileType.text,
-              path: null,
-              savedToGallery: false,
-              isMessage: true,
-              fileSize: utf8.encode(message).length,
-              senderAlias: server.getState().session!.senderAlias,
-              timestamp: DateTime.now().toUtc(),
-            ),
-          );
+      final sender = server.getState().session!.sender;
+      final deviceKey = sender.fingerprint.isNotEmpty ? sender.fingerprint : (sender.ip ?? '');
+      server.ref.notifier(chatHistoryProvider).addMessage(
+        deviceKey,
+        ChatMessage(
+          id: const Uuid().v4(),
+          isMe: false,
+          text: message,
+          timestamp: DateTime.now(),
+        ),
+      );
+      // 直接接受並結束 session，不跳轉舊版 ReceivePage
+      await acceptFileRequest({});
+      return;
     }
+
 
     final receiveProvider = ViewProvider((ref) {
       // No select: comparing the selected session runs the dart_mappable deep equality
@@ -368,6 +367,18 @@ class ReceiveController {
               timestamp: DateTime.now().toUtc(),
             ),
           );
+	final sender = receiveState.sender;
+      final deviceKey = sender.fingerprint.isNotEmpty ? sender.fingerprint : (sender.ip ?? '');
+      server.ref.notifier(chatHistoryProvider).addMessage(
+        deviceKey,
+        ChatMessage(
+          id: fileId,
+          isMe: false,
+          fileName: receivingFile.desiredName!,
+          filePath: filePath,
+          timestamp: DateTime.now(),
+        ),
+      );
     } else {
       server.ref.notifier(fileTransferProvider).setStatus(sessionId: event.sessionId, fileId: fileId, status: FileStatus.failed);
       server.setState(
@@ -430,18 +441,18 @@ class ReceiveController {
           _logger.info('Closing session');
 
           // ignore: use_build_context_synchronously, discarded_futures
-          Routerino.context.pushRootImmediately(() => const HomePage(initialTab: HomeTab.receive, appStart: false));
+          //Routerino.context.pushRootImmediately(() => const HomePage(initialTab: HomeTab.receive, appStart: false));
 
           // open the dialog to open file instantly
-          if (filePath != null && filePath.isNotEmpty) {
+          //if (filePath != null && filePath.isNotEmpty) {
             // ignore: discarded_futures
-            OpenFileDialog.open(
-              Routerino.context, // ignore: use_build_context_synchronously
-              filePath: filePath,
-              fileType: fileType,
-              openGallery: event.savedToGallery,
-            );
-          }
+            //OpenFileDialog.open(
+              //Routerino.context, // ignore: use_build_context_synchronously
+              //filePath: filePath,
+              //fileType: fileType,
+              //openGallery: event.savedToGallery,
+           // );
+          //}
         });
       }
       _logger.info('Received all files.');
