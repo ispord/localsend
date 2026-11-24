@@ -196,7 +196,7 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
-          msg.fileName != null ? '📄 [檔案] ${msg.fileName}' : (msg.text ?? ''),
+          msg.fileName != null ? '📄 [文件] ${msg.fileName}' : (msg.text ?? ''),
           style: const TextStyle(fontSize: 15, color: Colors.black87),
         ),
       ),
@@ -247,7 +247,7 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
                       decoration: InputDecoration(
                         fillColor: Colors.white,
                         filled: true,
-                        hintText: '輸入訊息...',
+                        hintText: '输入消息...',
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
                       ),
@@ -265,7 +265,7 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     ),
                     onPressed: _sendText,
-                    child: const Text('發送'),
+                    child: const Text('发送'),
                   ),
                 ],
               ),
