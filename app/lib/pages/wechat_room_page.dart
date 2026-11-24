@@ -1,3 +1,4 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -24,6 +25,50 @@ class WeChatRoomPage extends StatefulWidget {
 class _WeChatRoomPageState extends State<WeChatRoomPage> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+
+    bool _isDragging = false;
+
+  Future<void> _handleDroppedFiles(DropDoneDetails details) async {
+    if (details.files.isEmpty) return;
+
+    final now = DateTime.now().toIso8601String();
+    final crossFiles = <CrossFile>[];
+
+    for (final xFile in details.files) {
+      final path = xFile.path;
+      final file = File(path);
+      if (!file.existsSync() || FileSystemEntity.isDirectorySync(path)) {
+        continue; // 跳过空路径或文件夹
+      }
+      final name = xFile.name;
+      final size = file.lengthSync();
+      final isImg = _isImage(name);
+      final isVid = _isVideo(name);
+
+      crossFiles.add(
+        CrossFile(
+          name: name,
+          fileType: isImg ? FileType.image : (isVid ? FileType.video : FileType.other),
+          size: size,
+          thumbnail: null,
+          asset: null,
+          path: path,
+          bytes: null,
+          lastModified: now,
+          lastAccessed: now,
+        ),
+      );
+    }
+
+    if (crossFiles.isEmpty || !mounted) return;
+    await context.ref.notifier(sendProvider).startSession(
+      target: widget.device,
+      files: crossFiles,
+      background: true,
+    );
+    _scrollToBottom();
+  }
+
 
   String get _deviceKey => widget.device.fingerprint.isNotEmpty ? widget.device.fingerprint : (widget.device.ip ?? '');
 
