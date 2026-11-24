@@ -156,7 +156,7 @@ class ReceiveController {
         for (final f in files.values) f.id: f.fileName,
       });
       return;
-    }
+    
 
     if (checkPlatformHasTray() && (await windowManager.isMinimized() || !(await windowManager.isVisible()) || !(await windowManager.isFocused()))) {
       await showFromTray();
