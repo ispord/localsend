@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart' hide FileType;
@@ -10,7 +11,6 @@ import 'package:localsend_isolates/model/device.dart';
 import 'package:localsend_isolates/model/file_type.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:uuid/uuid.dart';
-import 'package:video_player/video_player.dart';
 
 class WeChatRoomPage extends StatefulWidget {
   final Device device;
@@ -35,6 +35,23 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   bool _isVideo(String name) {
     final ext = name.toLowerCase();
     return ext.endsWith('.mp4') || ext.endsWith('.mov') || ext.endsWith('.avi') || ext.endsWith('.mkv') || ext.endsWith('.webm');
+  }
+
+  Future<void> _openWithSystemApp(String filePath) async {
+    final file = File(filePath);
+    if (!file.existsSync()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('文件正在接收中，请稍后再试'), duration: Duration(seconds: 2)));
+      }
+      return;
+    }
+    if (Platform.isWindows) {
+      await Process.run('explorer', [filePath]);
+    } else if (Platform.isMacOS) {
+      await Process.run('open', [filePath]);
+    } else if (Platform.isLinux) {
+      await Process.run('xdg-open', [filePath]);
+    }
   }
 
   Future<void> _sendText() async {
@@ -107,28 +124,64 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   }
 
   Widget _buildBubble(ChatMessage msg) {
+    // 1. 图片消息（支持自动等待下载完成后显示缩略图 + 点击放大）
     if (msg.imageBytes != null || (msg.fileName != null && _isImage(msg.fileName!) && msg.filePath != null)) {
-      final imgWidget = msg.imageBytes != null
-          ? Image.memory(msg.imageBytes!, width: 180, fit: BoxFit.cover)
-          : Image.file(File(msg.filePath!), width: 180, fit: BoxFit.cover);
-
-      return GestureDetector(
-        onTap: () {
+      return _ChatImageBubble(
+        imageBytes: msg.imageBytes,
+        filePath: msg.filePath,
+        onTap: (bytes, path) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => _FullScreenImagePage(imageBytes: msg.imageBytes, filePath: msg.filePath),
+              builder: (_) => _FullScreenImagePage(imageBytes: bytes, filePath: path),
             ),
           );
         },
-        child: ClipRRect(borderRadius: BorderRadius.circular(6), child: imgWidget),
       );
     }
 
+    // 2. 视频消息（显示微信视频卡片 + 点击调用电脑默认播放器打开）
     if (msg.isVideo && msg.filePath != null) {
-      return _VideoThumbBubble(filePath: msg.filePath!, fileName: msg.fileName ?? '视频');
+      return GestureDetector(
+        onTap: () => _openWithSystemApp(msg.filePath!),
+        child: Container(
+          width: 210,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2B2B2B),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.play_circle_fill, size: 40, color: Color(0xFF07C160)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      msg.fileName ?? '视频文件',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('点击使用播放器打开', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
+    // 3. 普通文件或纯文本消息（点击文件可直接用系统软件打开，长按复制文字）
     return GestureDetector(
+      onTap: () {
+        if (msg.filePath != null) {
+          _openWithSystemApp(msg.filePath!);
+        }
+      },
       onLongPress: () {
         if (msg.text != null) {
           Clipboard.setData(ClipboardData(text: msg.text!));
@@ -149,7 +202,6 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -225,148 +277,119 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   }
 }
 
-class _VideoThumbBubble extends StatefulWidget {
-  final String filePath;
-  final String fileName;
-
-  const _VideoThumbBubble({required this.filePath, required this.fileName});
-
-  @override
-  State<_VideoThumbBubble> createState() => _VideoThumbBubbleState();
-}
-
-class _VideoThumbBubbleState extends State<_VideoThumbBubble> {
-  late VideoPlayerController _controller;
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(File(widget.filePath))
-      ..initialize().then((_) {
-        if (mounted) setState(() => _ready = true);
-      }).catchError((_) {});
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _FullScreenVideoPage(filePath: widget.filePath)),
-        );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if (_ready)
-              SizedBox(
-                width: 180,
-                child: AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)),
-              )
-            else
-              Container(
-                width: 180,
-                height: 110,
-                color: Colors.black87,
-                alignment: Alignment.bottomLeft,
-                padding: const EdgeInsets.all(8),
-                child: Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ),
-            const Icon(Icons.play_circle_fill, size: 42, color: Colors.white70),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FullScreenImagePage extends StatelessWidget {
+class _ChatImageBubble extends StatefulWidget {
   final Uint8List? imageBytes;
   final String? filePath;
+  final void Function(Uint8List? bytes, String? path) onTap;
 
-  const _FullScreenImagePage({this.imageBytes, this.filePath});
+  const _ChatImageBubble({this.imageBytes, this.filePath, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 5.0,
-          child: imageBytes != null
-              ? Image.memory(imageBytes!, fit: BoxFit.contain)
-              : Image.file(File(filePath!), fit: BoxFit.contain),
-        ),
-      ),
-    );
-  }
+  State<_ChatImageBubble> createState() => _ChatImageBubbleState();
 }
 
-class _FullScreenVideoPage extends StatefulWidget {
-  final String filePath;
+class _ChatImageBubbleState extends State<_ChatImageBubble> {
+  Timer? _timer;
+  bool _fileReady = false;
+  int _retryCount = 0;
 
-  const _FullScreenVideoPage({required this.filePath});
-
-  @override
-  State<_FullScreenVideoPage> createState() => _FullScreenVideoPageState();
+  @overridevoid initState() {
+super.initState();
+_checkFile();
+if (!_fileReady && widget.imageBytes == null && widget.filePath != null) {
+timer = Timer.periodic(const Duration(milliseconds: 500), () {
+_retryCount++;
+_checkFile();
+if (_fileReady || _retryCount > 40) {
+_timer?.cancel();
+}
+});
+}
+}
+void _checkFile() {
+if (widget.filePath != null) {
+final f = File(widget.filePath!);
+if (f.existsSync() && f.lengthSync() > 0) {
+if (mounted) {
+setState(() => _fileReady = true);
+}
+}
+}
+}
+@override
+void dispose() {
+_timer?.cancel();
+super.dispose();
+}
+@override
+Widget build(BuildContext context) {
+if (widget.imageBytes != null) {
+return GestureDetector(
+onTap: () => widget.onTap(widget.imageBytes, null),
+child: ClipRRect(
+borderRadius: BorderRadius.circular(6),
+child: Image.memory(widget.imageBytes!, width: 180, fit: BoxFit.cover),
+),
+);
+}
+if (fileReady && widget.filePath != null) {
+return GestureDetector(
+onTap: () => widget.onTap(null, widget.filePath),
+child: ClipRRect(
+borderRadius: BorderRadius.circular(6),
+child: Image.file(
+File(widget.filePath!),
+width: 180,
+fit: BoxFit.cover,
+errorBuilder: (, _, _) {
+Future.delayed(const Duration(milliseconds: 500), () {
+if (mounted) setState(() {});
+});
+return _buildPlaceholder();
+},
+),
+),
+);
+}
+return _buildPlaceholder();
+}
+Widget _buildPlaceholder() {
+return Container(
+width: 180,
+height: 120,
+decoration: BoxDecoration(
+color: Colors.black12,
+borderRadius: BorderRadius.circular(6),
+),
+alignment: Alignment.center,
+child: const SizedBox(
+width: 24,
+height: 24,
+child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF07C160)),
+),
+);
+}
+}
+class _FullScreenImagePage extends StatelessWidget {
+final Uint8List? imageBytes;
+final String? filePath;
+const _FullScreenImagePage({this.imageBytes, this.filePath});
+@override
+Widget build(BuildContext context) {
+return Scaffold(
+backgroundColor: Colors.black,
+appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
+body: Center(
+child: InteractiveViewer(
+minScale: 0.5,
+maxScale: 5.0,
+child: imageBytes != null
+? Image.memory(imageBytes!, fit: BoxFit.contain)
+: Image.file(File(filePath!), fit: BoxFit.contain),
+),
+),
+);
+}
 }
 
-class _FullScreenVideoPageState extends State<_FullScreenVideoPage> {
-  late VideoPlayerController _controller;
-  bool _ready = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(File(widget.filePath))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() => _ready = true);
-          _controller.play();
-        }
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
-      body: Center(
-        child: _ready
-            ? GestureDetector(
-                onTap: () => setState(() => _controller.value.isPlaying ? _controller.pause() : _controller.play()),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)),
-                      ),
-                    ),
-                    VideoProgressIndicator(_controller, allowScrubbing: true, padding: const EdgeInsets.all(16)),
-                  ],
-                ),
-              )
-            : const CircularProgressIndicator(color: Colors.white),
-      ),
-    );
-  }
-}
