@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:pasteboard/pasteboard.dart';
+import 'package:localsend_isolates/model/session_status.dart';
 import 'package:file_picker/file_picker.dart' hide FileType;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,37 @@ class WeChatRoomPage extends StatefulWidget {
 
   @override
   State<WeChatRoomPage> createState() => _WeChatRoomPageState();
+}
+Widget _buildStatusIcon(ChatMessage msg) {
+  if (!msg.isMe) return const SizedBox.shrink();
+  switch (msg.status) {
+    case MsgSendStatus.sending:
+      return const Padding(
+        padding: EdgeInsets.only(right: 6),
+        child: SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.grey),
+        ),
+      );
+    case MsgSendStatus.success:
+      return const Padding(
+        padding: EdgeInsets.only(right: 6),
+        child: Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF07C160)),
+      );
+    case MsgSendStatus.failed:
+      return GestureDetector(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('发送失败，请检查对方设备是否在线'), duration: Duration(seconds: 2)),
+          );
+        },
+        child: const Padding(
+          padding: EdgeInsets.only(right: 6),
+          child: Icon(Icons.error, size: 18, color: Colors.redAccent),
+        ),
+      );
+  }
 }
 
 class _WeChatRoomPageState extends State<WeChatRoomPage> {
@@ -363,6 +395,26 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   @override
   Widget build(BuildContext context) {
     final messages = context.ref.watch(chatHistoryProvider)[_deviceKey] ?? [];
+final sessions = context.ref.watch(sendProvider);
+for (final msg in messages) {
+  if (msg.isMe && msg.sessionId != null && msg.status == MsgSendStatus.sending) {
+    final session = sessions[msg.sessionId];
+    if (session != null) {
+      if (session.status == SessionStatus.finished) {
+        Future.microtask(() => context.ref.notifier(chatHistoryProvider).updateSessionStatus(msg.sessionId!, MsgSendStatus.success));
+      } else if (session.status == SessionStatus.declined ||
+          session.status == SessionStatus.recipientBusy ||
+          session.status == SessionStatus.finishedWithErrors ||
+          session.status == SessionStatus.canceledBySender ||
+          session.status == SessionStatus.canceledByReceiver) {
+        Future.microtask(() => context.ref.notifier(chatHistoryProvider).updateSessionStatus(msg.sessionId!, MsgSendStatus.failed));
+      }
+    }
+  }
+}
+
+
+
 
     return CallbackShortcuts(
       bindings: {
