@@ -2,6 +2,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:pasteboard/pasteboard.dart';
 import 'package:file_picker/file_picker.dart' hide FileType;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,6 +65,116 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
     await context.ref.notifier(sendProvider).startSession(
       target: widget.device,
       files: crossFiles,
+      background: true,
+    );
+    _scrollToBottom();
+  }
+
+  Future<void> _handlePaste() async {
+    // 1. 优先检测剪贴板里是否有截图图片
+    final imageBytes = await Pasteboard.image;
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('发送剪贴板图片', style: TextStyle(fontSize: 16)),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 280),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.memory(imageBytes, fit: BoxFit.contain),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF07C160), foregroundColor: Colors.white),
+              autofocus: true,
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('发送'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await _sendImageBytes(imageBytes);
+      }
+      return;
+    }
+
+    // 2. 其次检测剪贴板里是否有直接 Ctrl+C 复制的本地文件
+    final copiedPaths = await Pasteboard.files();
+    if (copiedPaths.isNotEmpty) {
+      final now = DateTime.now().toIso8601String();
+      final crossFiles = <CrossFile>[];
+      for (final path in copiedPaths) {
+        final file = File(path);
+        if (!file.existsSync() || FileSystemEntity.isDirectorySync(path)) continue;
+        final name = path.split(Platform.pathSeparator).last;
+        final isImg = _isImage(name);
+        final isVid = _isVideo(name);
+        crossFiles.add(
+          CrossFile(
+            name: name,
+            fileType: isImg ? FileType.image : (isVid ? FileType.video : FileType.other),
+            size: file.lengthSync(),
+            thumbnail: null,
+            asset: null,
+            path: path,
+            bytes: null,
+            lastModified: now,
+            lastAccessed: now,
+          ),
+        );
+      }
+      if (crossFiles.isNotEmpty && mounted) {
+        await context.ref.notifier(sendProvider).startSession(
+          target: widget.device,
+          files: crossFiles,
+          background: true,
+        );
+        _scrollToBottom();
+      }
+      return;
+    }
+
+    // 3. 如果是纯文本，正常追加到输入框里
+    final textData = await Clipboard.getData(Clipboard.kTextPlain);
+    if (textData?.text != null && textData!.text!.isNotEmpty) {
+      final current = _textController.text;
+      final selection = _textController.selection;
+      if (selection.isValid) {
+        final newText = current.replaceRange(selection.start, selection.end, textData.text!);
+        _textController.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: selection.start + textData.text!.length),
+        );
+      } else {
+        _textController.text = current + textData.text!;
+      }
+    }
+  }
+
+  Future<void> _sendImageBytes(Uint8List bytes) async {
+    final now = DateTime.now().toIso8601String();
+    final fileName = 'screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
+    final imgFile = CrossFile(
+      name: fileName,
+      fileType: FileType.image,
+      size: bytes.length,
+      thumbnail: null,
+      asset: null,
+      path: null,
+      bytes: bytes,
+      lastModified: now,
+      lastAccessed: now,
+    );
+
+    if (!mounted) return;
+    await context.ref.notifier(sendProvider).startSession(
+      target: widget.device,
+      files: [imgFile],
       background: true,
     );
     _scrollToBottom();
@@ -253,14 +364,20 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   Widget build(BuildContext context) {
     final messages = context.ref.watch(chatHistoryProvider)[_deviceKey] ?? [];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFEDEDED),
-      appBar: AppBar(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyV, control: true): _handlePaste,
+        const SingleActivator(LogicalKeyboardKey.keyV, meta: true): _handlePaste,
+      },
+      child: Scaffold(
         backgroundColor: const Color(0xFFEDEDED),
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-        title: Text(widget.device.alias, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-      ),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFFEDEDED),
+          foregroundColor: Colors.black,
+          elevation: 0.5,
+          title: Text(widget.device.alias, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        ),
+
       body: DropTarget(
         onDragEntered: (_) => setState(() => _isDragging = true),
         onDragExited: (_) => setState(() => _isDragging = false),
