@@ -157,16 +157,17 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 50), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          0.0,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
     });
   }
+
 
   Widget _buildBubble(ChatMessage msg) {
     // 1. 图片消息（支持自动等待下载完成后显示缩略图 + 点击放大）
@@ -271,23 +272,38 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
           children: [
             Column(
               children: [
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(12),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = messages[index];
-                      return Align(
-                        alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: _buildBubble(msg),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+          Expanded(
+            child: Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: true,
+              interactive: true,
+              child: ListView.builder(
+                controller: _scrollController,
+                reverse: true, // 核心：从底部开始排列，新消息永远在最下方
+                padding: const EdgeInsets.all(12),
+                itemCount: messages.length,
+                itemBuilder: (context, index) {
+                  // 因为 reverse: true，索引 0 显示在最底部，所以倒序取最后一条消息
+                  final msg = messages[messages.length - 1 - index];
+                  return Align(
+                    alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (msg.isMe) _buildStatusIcon(msg),
+                          _buildBubble(msg),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
                 Container(
                   color: const Color(0xFFF7F7F7),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
