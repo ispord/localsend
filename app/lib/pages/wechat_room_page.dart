@@ -314,239 +314,246 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
           child: SizedBox(
             width: 14,
             height: 14,
-          child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.grey),
-        ),
-      );
-    case MsgSendStatus.success:
-      return const Padding(
-        padding: EdgeInsets.only(right: 6),
-        child: Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF07C160)),
-      );
-    case MsgSendStatus.failed:
-      return GestureDetector(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('发送失败，请检查对方设备是否在线'), duration: Duration(seconds: 2)),
-          );
-        },
-        child: const Padding(
-          padding: EdgeInsets.only(right: 6),
-          child: Icon(Icons.error, size: 18, color: Colors.redAccent),
-        ),
-      );
-  }
-}
-
-Widget _buildBubble(ChatMessage msg) {
-  if (msg.imageBytes != null || (msg.fileName != null && _isImage(msg.fileName!) && msg.filePath != null)) {
-    return ChatImageBubble(
-      imageBytes: msg.imageBytes,
-      filePath: msg.filePath,
-      onTap: (bytes, path) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => _FullScreenImagePage(imageBytes: bytes, filePath: path),
+            child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.grey),
           ),
         );
-      },
-    );
+      case MsgSendStatus.success:
+        return const Padding(
+          padding: EdgeInsets.only(right: 6),
+          child: Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF07C160)),
+        );
+      case MsgSendStatus.failed:
+        return GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('发送失败，请检查对方设备是否在线'), duration: Duration(seconds: 2)),
+            );
+          },
+          child: const Padding(
+            padding: EdgeInsets.only(right: 6),
+            child: Icon(Icons.error, size: 18, color: Colors.redAccent),
+          ),
+        );
+    }
   }
-  if (msg.isVideo && msg.filePath != null) {
-    return GestureDetector(
-      onTap: () => _openWithSystemApp(msg.filePath!),
-      child: Container(
-        width: 210,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2B2B2B),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.play_circle_fill, size: 40, color: Color(0xFF07C160)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    msg.fileName ?? '视频文件',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text('点击使用播放器打开', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  return GestureDetector(
-    onTap: () {
-      if (msg.filePath != null) {
-        _openWithSystemApp(msg.filePath!);
-      }
-    },
-    onLongPress: () {
-      if (msg.text != null) {
-        Clipboard.setData(ClipboardData(text: msg.text!));
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)));
-      }
-    },
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      constraints: const BoxConstraints(maxWidth: 260),
-      decoration: BoxDecoration(
-        color: msg.isMe ? const Color(0xFF95EC69) : Colors.white,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        msg.fileName != null ? '📄 [文件] ${msg.fileName}' : (msg.text ?? ''),
-        style: const TextStyle(fontSize: 15, color: Colors.black87),
-      ),
-    ),
-  );
-}
 
-@override
-Widget build(BuildContext context) {
-  final messages = context.ref.watch(chatHistoryProvider)[_deviceKey] ?? [];
-  final sessions = context.ref.watch(sendProvider);
-  for (final msg in messages) {
-    if (msg.isMe && msg.sessionId != null && msg.status == MsgSendStatus.sending) {
-      final session = sessions[msg.sessionId];
-      if (session != null) {
-        if (session.status == SessionStatus.finished) {
-          Future.microtask(() => context.ref.notifier(chatHistoryProvider).updateSessionStatus(msg.sessionId!, MsgSendStatus.success));
-        } else if (session.status == SessionStatus.declined ||
-            session.status == SessionStatus.recipientBusy ||
-            session.status == SessionStatus.finishedWithErrors ||
-            session.status == SessionStatus.canceledBySender ||
-            session.status == SessionStatus.canceledByReceiver) {
-          Future.microtask(() => context.ref.notifier(chatHistoryProvider).updateSessionStatus(msg.sessionId!, MsgSendStatus.failed));
+  Widget _buildBubble(ChatMessage msg) {
+    if (msg.imageBytes != null || (msg.fileName != null && _isImage(msg.fileName!) && msg.filePath != null)) {
+      return _ChatImageBubble(
+        imageBytes: msg.imageBytes,
+        filePath: msg.filePath,
+        onTap: (bytes, path) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => _FullScreenImagePage(imageBytes: bytes, filePath: path),
+            ),
+          );
+        },
+      );
+    }
+    if (msg.isVideo && msg.filePath != null) {
+      return GestureDetector(
+        onTap: () => _openWithSystemApp(msg.filePath!),
+        child: Container(
+          width: 210,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2B2B2B),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.play_circle_fill, size: 40, color: Color(0xFF07C160)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      msg.fileName ?? '视频文件',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('点击使用播放器打开', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: () {
+        if (msg.filePath != null) {
+          _openWithSystemApp(msg.filePath!);
+        }
+      },
+      onLongPress: () {
+        if (msg.text != null) {
+          Clipboard.setData(ClipboardData(text: msg.text!));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: const BoxConstraints(maxWidth: 260),
+        decoration: BoxDecoration(
+          color: msg.isMe ? const Color(0xFF95EC69) : Colors.white,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          msg.fileName != null ? '📄 [文件] ${msg.fileName}' : (msg.text ?? ''),
+          style: const TextStyle(fontSize: 15, color: Colors.black87),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = context.ref.watch(chatHistoryProvider)[_deviceKey] ?? [];
+    final sessions = context.ref.watch(sendProvider);
+    for (final msg in messages) {
+      if (msg.isMe && msg.sessionId != null && msg.status == MsgSendStatus.sending) {
+        final session = sessions[msg.sessionId];
+        if (session != null) {
+          if (session.status == SessionStatus.finished) {
+            Future.microtask(
+              () => context.ref.notifier(chatHistoryProvider).updateSessionStatus(msg.sessionId!, MsgSendStatus.success),
+            );
+          } else if (session.status == SessionStatus.declined ||
+              session.status == SessionStatus.recipientBusy ||
+              session.status == SessionStatus.finishedWithErrors ||
+              session.status == SessionStatus.canceledBySender ||
+              session.status == SessionStatus.canceledByReceiver) {
+            Future.microtask(
+              () => context.ref.notifier(chatHistoryProvider).updateSessionStatus(msg.sessionId!, MsgSendStatus.failed),
+            );
+          }
         }
       }
     }
-  }
-  return CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.keyV, control: true): _handlePaste,
-      const SingleActivator(LogicalKeyboardKey.keyV, meta: true): _handlePaste,
-    },
-    child: Scaffold(
-      backgroundColor: const Color(0xFFEDEDED),
-      appBar: AppBar(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyV, control: true): _handlePaste,
+        const SingleActivator(LogicalKeyboardKey.keyV, meta: true): _handlePaste,
+      },
+      child: Scaffold(
         backgroundColor: const Color(0xFFEDEDED),
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-        title: Text(widget.device.alias, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-      ),
-      body: DropTarget(
-        onDragEntered: (details) => setState(() => _isDragging = true),
-        onDragExited: (details) => setState(() => _isDragging = false),
-        onDragDone: (details) async {
-          setState(() => _isDragging = false);
-          await _handleDroppedFiles(details);
-        },
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: Scrollbar(
-                    controller: _scrollController,
-                    thumbVisibility: true,
-                    interactive: true,
-                    child: ListView.builder(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFFEDEDED),
+          foregroundColor: Colors.black,
+          elevation: 0.5,
+          title: Text(widget.device.alias, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        ),
+        body: DropTarget(
+          onDragEntered: (details) => setState(() => _isDragging = true),
+          onDragExited: (details) => setState(() => _isDragging = false),
+          onDragDone: (details) async {
+            setState(() => _isDragging = false);
+            await _handleDroppedFiles(details);
+          },
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: Scrollbar(
                       controller: _scrollController,
-                      reverse: true,
-                      padding: const EdgeInsets.all(12),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[messages.length - 1 - index];
-                        return Align(
-                          alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                if (msg.isMe) _buildStatusIcon(msg),
-                                _buildBubble(msg),
-                              ],
+                      thumbVisibility: true,
+                      interactive: true,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = messages[messages.length - 1 - index];
+                          return Align(
+                            alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  if (msg.isMe) _buildStatusIcon(msg),
+                                  _buildBubble(msg),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                Container(
-                  color: const Color(0xFFF7F7F7),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: SafeArea(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: textController,
-                            onSubmitted: (_) => _sendText(),
-                            decoration: InputDecoration(
-                              fillColor: Colors.white,
-                              filled: true,
-                              hintText: '输入消息...',
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(6),
-                                borderSide: BorderSide.none,
+                  Container(
+                    color: const Color(0xFFF7F7F7),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: SafeArea(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _textController,
+                              onSubmitted: (_) => _sendText(),
+                              decoration: InputDecoration(
+                                fillColor: Colors.white,
+                                filled: true,
+                                hintText: '输入消息...',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide.none,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline, size: 28, color: Colors.black87),
-                          onPressed: _pickAndSendFile,
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF07C160),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline, size: 28, color: Colors.black87),
+                            onPressed: _pickAndSendFile,
                           ),
-                          onPressed: _sendText,
-                          child: const Text('发送'),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF07C160),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            ),
+                            onPressed: _sendText,
+                            child: const Text('发送'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (_isDragging)
+                Positioned.fill(
+                  child: Container(
+                    color: const Color(0xCC07C160),
+                    alignment: Alignment.center,
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.file_upload_outlined, size: 64, color: Colors.white),
+                        SizedBox(height: 12),
+                        Text(
+                          '松开鼠标立即发送文件或文件夹',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ],
-            ),
-            if (_isDragging)
-              Positioned.fill(
-                child: Container(
-                  color: const Color(0xCC07C160),
-                  alignment: Alignment.center,
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.file_upload_outlined, size: 64, color: Colors.white),
-                      SizedBox(height: 12),
-                      Text(
-                        '松开鼠标立即发送文件或文件夹',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
