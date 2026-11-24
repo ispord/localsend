@@ -101,9 +101,14 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     // can be mapped back to the corresponding file.
     final selectedFiles = files.map((file) => (id: _uuid.v4(), file: file)).toList();
     // 寫入聊天氣泡紀錄（我發送的）
+    // 寫入聊天氣泡紀錄（我發送的）
     final deviceKey = target.fingerprint.isNotEmpty ? target.fingerprint : (target.ip ?? '');
     for (final file in files) {
       final isText = file.fileType == FileType.text && file.bytes != null;
+      final lower = file.name.toLowerCase();
+      final isImg = file.fileType == FileType.image || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp') || lower.endsWith('.bmp');
+      final isVid = file.fileType == FileType.video || lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.avi') || lower.endsWith('.mkv') || lower.endsWith('.webm');
+
       ref.notifier(chatHistoryProvider).addMessage(
         deviceKey,
         ChatMessage(
@@ -112,10 +117,13 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           text: isText ? createMessagePreview(file.bytes) : null,
           fileName: isText ? null : file.name,
           filePath: file.path,
+          imageBytes: isImg ? file.bytes : null,
+          isVideo: isVid,
           timestamp: DateTime.now(),
         ),
       );
     }
+
 
 
     state = state.updateSession(
