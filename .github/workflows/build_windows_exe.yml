@@ -1,12 +1,16 @@
           & 'C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe' pack /o /d support\build\msix\content /nv /p app\windows\localsend_msix_helper.msix
 
-      - name: Dependencies
-        working-directory: app
-        run: flutter pub get
+      - name: Configure Flutter Mirror
+        run: |
+         echo "PUB_HOSTED_URL=https://pub.flutter-io.cn" >> $GITHUB_ENV
+         echo "FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn" >> $GITHUB_ENV
+       shell: bash
 
-      - name: Compile for Windows
-        working-directory: app
+      - name: Build Windows
         run: flutter build windows
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
 
       - name: Prepare Inno Setup payload
         run: |
