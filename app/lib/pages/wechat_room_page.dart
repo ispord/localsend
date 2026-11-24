@@ -446,8 +446,8 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
           title: Text(widget.device.alias, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         ),
         body: DropTarget(
-          onDragEntered: () => setState(() => _isDragging = true),
-          onDragExited: () => setState(() => _isDragging = false),
+          onDragEntered: (details) => setState(() => _isDragging = true),
+          onDragExited: (details) => setState(() => _isDragging = false),
           onDragDone: (details) async {
             setState(() => _isDragging = false);
             await _handleDroppedFiles(details);
