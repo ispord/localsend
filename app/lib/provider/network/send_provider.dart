@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'dart:async';
 import 'package:localsend_app/provider/chat_history_provider.dart';
 import 'package:flutter/material.dart';
