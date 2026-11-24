@@ -117,7 +117,8 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           text: isText ? createMessagePreview(file.bytes) : null,
           fileName: isText ? null : file.name,
           filePath: file.path,
-          imageBytes: isImg ? file.bytes : null,
+          imageBytes: (isImg && file.bytes != null) ? Uint8List.fromList(file.bytes!) : null,
+
           isVideo: isVid,
           timestamp: DateTime.now(),
         ),
