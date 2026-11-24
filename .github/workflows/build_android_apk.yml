@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: "3.50.0"      # 与 Windows 构建保持一致
+  FLUTTER_VERSION: "3.50.0"
   APK_BUILD_DIR: "/tmp/build"
 
 jobs:
@@ -34,6 +34,7 @@ jobs:
 
       - name: Copy files to build dir
         run: |
+          rm -rf $APK_BUILD_DIR
           mkdir -p $APK_BUILD_DIR
           cp -r . $APK_BUILD_DIR
 
@@ -49,11 +50,11 @@ jobs:
           ENCODED_STRING: ${{ secrets.ANDROID_KEY_STORE }}
         run: mkdir -p secrets && echo "$ENCODED_STRING" | base64 -di > secrets/android-keystore.jks
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -62,20 +63,20 @@ jobs:
           channel: stable
           cache: true
 
-      # workspace 项目：pub get 在仓库根目录（/tmp/build）
       - name: Install dependencies
         working-directory: ${{ env.APK_BUILD_DIR }}
         run: flutter pub get
-        
+
+      # ================= 调试步骤开始 =================
       - name: Debug Android config
         working-directory: ${{ env.APK_BUILD_DIR }}/app/android
         run: |
-          echo "=========== PRINTING SETTINGS.GRADLE ==========="
+          echo "=========== SETTINGS.GRADLE ==========="
           cat settings.gradle
-          echo "=========== PRINTING GRADLE-WRAPPER.PROPERTIES ==========="
+          echo "=========== GRADLE-WRAPPER.PROPERTIES ==========="
           cat gradle/wrapper/gradle-wrapper.properties
-      
-      # 构建在 app 子目录（有 android/ 的地方）
+      # ================= 调试步骤结束 =================
+
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
         run: flutter build apk --release
