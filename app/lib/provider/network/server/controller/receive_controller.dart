@@ -133,7 +133,7 @@ class ReceiveController {
           statuses: {for (final file in files.values) file.id: FileStatus.queue},
         );
 
-     bool quickSave = settings.quickSave && server.getState().session?.isMessageRequest != true;
+    bool quickSave = settings.quickSave && server.getState().session?.isMessageRequest != true;
     final quickSaveFromFavorites = settings.quickSaveFromFavorites && server.getState().session?.isMessageRequest != true;
     if (quickSaveFromFavorites && senderFavorite != null) {
       quickSave = true;
@@ -192,63 +192,6 @@ class ReceiveController {
     });
   }
 
-
-
-
-    final receiveProvider = ViewProvider((ref) {
-      // No select: comparing the selected session runs the dart_mappable deep equality
-      // over the whole files map on every state change.
-      final session = ref.watch(serverProvider)?.session;
-      return ReceivePageVm(
-        status: session?.status,
-        sender: session?.sender ?? Device.empty,
-        // An anonymous sender (empty fingerprint) has nothing to verify.
-        showSenderInfo: session == null || session.sender.fingerprint.isNotEmpty,
-        files: session?.files.values.map((f) => f.file).toList() ?? [],
-        message: message,
-        onAccept: () async {
-          if (message != null) {
-            // accept nothing
-            await ref.notifier(serverProvider).acceptFileRequest({});
-            return;
-          }
-
-          final sessionId = ref.read(serverProvider)?.session?.sessionId;
-          if (sessionId == null) {
-            return;
-          }
-
-          final selectedFiles = ref.read(selectedReceivingFilesProvider);
-
-          // Push before accepting: the permission request in [acceptFileRequest] may block for a while.
-          unawaited(
-            Routerino.context.pushAndRemoveUntilImmediately(
-              removeUntil: ReceivePage,
-              builder: () => ProgressPage(
-                showAppBar: false,
-                closeSessionOnClose: true,
-                sessionId: sessionId,
-              ),
-            ),
-          );
-
-          await ref.notifier(serverProvider).acceptFileRequest(selectedFiles);
-        },
-        onDecline: () {
-          ref.notifier(serverProvider).declineFileRequest();
-        },
-        onClose: () {
-          ref.notifier(serverProvider).closeSession();
-        },
-      );
-    });
-
-    server.ref.notifier(selectedReceivingFilesProvider).setFiles(files.values.toList());
-
-    // ignore: use_build_context_synchronously, unawaited_futures
-    Routerino.context.push(() => ReceivePage(receiveProvider));
-  }
-
   /// An accepted file started being uploaded.
   /// The server isolate receives and saves the file on its own
   /// ([HttpServerReceiveConfig] was sent with the accept decision);
@@ -270,6 +213,7 @@ class ReceiveController {
       server.ref.redux(parentIsolateProvider).dispatch(IsolateHttpServerCancelSessionAction(sessionId: event.sessionId));
       return;
     }
+
 
     // begin of actual file transfer
     server.ref.notifier(fileTransferProvider).setStatus(sessionId: event.sessionId, fileId: fileId, status: FileStatus.sending);
