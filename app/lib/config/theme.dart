@@ -142,13 +142,14 @@ extension InputDecorationThemeExt on InputDecorationThemeData {
 
 ColorScheme _determineColorScheme(ColorMode mode, Color customColor, Brightness brightness, DynamicColors? dynamicColors) {
   final defaultColorScheme = ColorScheme.fromSeed(
-    seedColor: Colors.teal,
+    seedColor: const Color(0xFF07C160), // 微信綠
     brightness: brightness,
+    surface: brightness == Brightness.light ? const Color(0xFFEDEDED) : null, // 微信背景灰
   );
 
   final colorScheme = switch (mode) {
     ColorMode.system => brightness == Brightness.light ? dynamicColors?.light : dynamicColors?.dark,
-    ColorMode.localsend => null,
+    ColorMode.localsend => defaultColorScheme,
     ColorMode.oled => (dynamicColors?.dark ?? defaultColorScheme).copyWith(
       surface: Colors.black,
     ),
@@ -161,6 +162,7 @@ ColorScheme _determineColorScheme(ColorMode mode, Color customColor, Brightness 
 
   return colorScheme ?? defaultColorScheme;
 }
+
 
 ThemeData _getYaruTheme(Brightness brightness) {
   final baseTheme = brightness == Brightness.light ? yaru.yaruLight : yaru.yaruDark;
