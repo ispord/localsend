@@ -61,7 +61,7 @@ class SettingsService extends PureNotifier<SettingsState> {
     destination: _persistence.getDestination(),
     saveToGallery: _persistence.isSaveToGallery(),
     saveToHistory: _persistence.isSaveToHistory(),
-    quickSave: _persistence.getQuickSave() == QuickSaveMode.on,
+    quickSave: true, // 預設開啟快速接收，實現聊天室直接收發,
     quickSaveFromFavorites: _persistence.getQuickSave() == QuickSaveMode.paired,
     receivePin: _persistence.getReceivePin(),
     autoFinish: _persistence.isAutoFinish(),
