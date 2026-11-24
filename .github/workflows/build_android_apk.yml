@@ -67,29 +67,33 @@ jobs:
         working-directory: ${{ env.APK_BUILD_DIR }}
         run: flutter pub get
 
-      # 👇 新增：修复第三方老包 device_apps 的 Gradle 兼容性问题 👇
+      # 👇 补丁 1：修复第三方老旧库 device_apps 的 Gradle 问题 👇
       - name: Patch device_apps gradle
         run: |
           DEVICE_APPS_DIR=$(find ~/.pub-cache/git -type d -name "device_apps-*" | head -n 1)
           if [ -n "$DEVICE_APPS_DIR" ]; then
             echo "Found device_apps at: $DEVICE_APPS_DIR"
-            # 1. 替换被废弃的 jcenter() 为 mavenCentral()
             sed -i 's/jcenter()/mavenCentral()/g' "$DEVICE_APPS_DIR/android/build.gradle"
-            # 2. 在文件开头强制补上 com.android.library 插件
             sed -i '1i apply plugin: "com.android.library"' "$DEVICE_APPS_DIR/android/build.gradle"
-          else
-            echo "device_apps not found!"
           fi
 
-      # ================= 调试步骤 =================
-      - name: Debug Android config
-        working-directory: ${{ env.APK_BUILD_DIR }}/app/android
+      # 👇 补丁 2：自动修复源码中不兼容新版 Flutter/Dart 的语法错误 👇
+      - name: Patch Dart code errors
+        working-directory: ${{ env.APK_BUILD_DIR }}/app
         run: |
-          echo "=========== SETTINGS.GRADLE ==========="
-          cat settings.gradle
-          echo "=========== GRADLE-WRAPPER.PROPERTIES ==========="
-          cat gradle/wrapper/gradle-wrapper.properties
-      # ============================================
+          echo "Fixing FilePicker APIs..."
+          sed -i 's/FilePicker.clearTemporaryFiles()/FilePicker.platform.clearTemporaryFiles()/g' lib/util/native/cache_helper.dart || true
+          sed -i 's/FilePicker.pickFiles/FilePicker.platform.pickFiles/g' lib/pages/wechat_room_page.dart || true
+          sed -i 's/FilePicker.getDirectoryPath()/FilePicker.platform.getDirectoryPath()/g' lib/util/native/pick_directory_path.dart || true
+
+          echo "Fixing wildcard '_' conflicts..."
+          sed -i 's/(_, _)/(context, index)/g' lib/pages/tabs/send_tab.dart || true
+          sed -i 's/(_, _)/(context, result)/g' lib/pages/web_share_page.dart || true
+          sed -i 's/(_, _, _)/(context, error, stackTrace)/g' lib/widget/file_thumbnail.dart || true
+
+          echo "Fixing null-aware-elements..."
+          sed -i 's/?trailing/if (trailing != null) trailing/g' lib/widget/list_tile/custom_list_tile.dart || true
+          sed -i 's/?prefix/if (prefix != null) prefix/g' lib/widget/copyable_text.dart || true
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
