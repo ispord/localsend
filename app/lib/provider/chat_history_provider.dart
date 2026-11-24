@@ -29,13 +29,20 @@ class ChatHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>> {
 
   void addMessage(String deviceKey, ChatMessage message) {
     final currentList = state[deviceKey] ?? [];
+    if (currentList.isNotEmpty) {
+      final last = currentList.last;
+      final isSameSide = last.isMe == message.isMe;
+      final isSameFile = message.fileName != null && last.fileName == message.fileName;
+      final isSameText = message.text != null && last.text == message.text;
+      final isWithin3Seconds = message.timestamp.difference(last.timestamp).inSeconds.abs() <= 3;
+
+      if (isSameSide && isWithin3Seconds && (isSameFile || isSameText)) {
+        return; // 拦截重复写入，确保只显示 1 张缩略图 / 1 条气泡
+      }
+    }
+
     state = {
       ...state,
       deviceKey: [...currentList, message],
     };
   }
-}
-
-final chatHistoryProvider = NotifierProvider<ChatHistoryNotifier, Map<String, List<ChatMessage>>>((ref) {
-  return ChatHistoryNotifier();
-});
