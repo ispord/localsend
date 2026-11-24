@@ -108,11 +108,19 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
 
   Widget _buildBubble(ChatMessage msg) {
     if (msg.imageBytes != null || (msg.fileName != null && _isImage(msg.fileName!) && msg.filePath != null)) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: msg.imageBytes != null
-            ? Image.memory(msg.imageBytes!, width: 180, fit: BoxFit.cover)
-            : Image.file(File(msg.filePath!), width: 180, fit: BoxFit.cover),
+      final imgWidget = msg.imageBytes != null
+          ? Image.memory(msg.imageBytes!, width: 180, fit: BoxFit.cover)
+          : Image.file(File(msg.filePath!), width: 180, fit: BoxFit.cover);
+
+      return GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => _FullScreenImagePage(imageBytes: msg.imageBytes, filePath: msg.filePath),
+            ),
+          );
+        },
+        child: ClipRRect(borderRadius: BorderRadius.circular(6), child: imgWidget),
       );
     }
 
@@ -141,6 +149,7 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -247,27 +256,116 @@ class _VideoThumbBubbleState extends State<_VideoThumbBubble> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (_ready)
-            SizedBox(
-              width: 180,
-              child: AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)),
-            )
-          else
-            Container(
-              width: 180,
-              height: 110,
-              color: Colors.black87,
-              alignment: Alignment.bottomLeft,
-              padding: const EdgeInsets.all(8),
-              child: Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-            ),
-          const Icon(Icons.play_circle_fill, size: 42, color: Colors.white70),
-        ],
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => _FullScreenVideoPage(filePath: widget.filePath)),
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (_ready)
+              SizedBox(
+                width: 180,
+                child: AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)),
+              )
+            else
+              Container(
+                width: 180,
+                height: 110,
+                color: Colors.black87,
+                alignment: Alignment.bottomLeft,
+                padding: const EdgeInsets.all(8),
+                child: Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ),
+            const Icon(Icons.play_circle_fill, size: 42, color: Colors.white70),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FullScreenImagePage extends StatelessWidget {
+  final Uint8List? imageBytes;
+  final String? filePath;
+
+  const _FullScreenImagePage({this.imageBytes, this.filePath});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 5.0,
+          child: imageBytes != null
+              ? Image.memory(imageBytes!, fit: BoxFit.contain)
+              : Image.file(File(filePath!), fit: BoxFit.contain),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullScreenVideoPage extends StatefulWidget {
+  final String filePath;
+
+  const _FullScreenVideoPage({required this.filePath});
+
+  @override
+  State<_FullScreenVideoPage> createState() => _FullScreenVideoPageState();
+}
+
+class _FullScreenVideoPageState extends State<_FullScreenVideoPage> {
+  late VideoPlayerController _controller;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.filePath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _ready = true);
+          _controller.play();
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
+      body: Center(
+        child: _ready
+            ? GestureDetector(
+                onTap: () => setState(() => _controller.value.isPlaying ? _controller.pause() : _controller.play()),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)),
+                      ),
+                    ),
+                    VideoProgressIndicator(_controller, allowScrubbing: true, padding: const EdgeInsets.all(16)),
+                  ],
+                ),
+              )
+            : const CircularProgressIndicator(color: Colors.white),
       ),
     );
   }
