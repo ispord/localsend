@@ -260,67 +260,95 @@ class _WeChatRoomPageState extends State<WeChatRoomPage> {
         elevation: 0.5,
         title: Text(widget.device.alias, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(12),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final msg = messages[index];
-                return Align(
-                  alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: _buildBubble(msg),
+      body: DropTarget(
+        onDragEntered: (_) => setState(() => _isDragging = true),
+        onDragExited: (_) => setState(() => _isDragging = false),
+        onDragDone: (details) async {
+          setState(() => _isDragging = false);
+          await _handleDroppedFiles(details);
+        },
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(12),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = messages[index];
+                      return Align(
+                        alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: _buildBubble(msg),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+                Container(
+                  color: const Color(0xFFF7F7F7),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: SafeArea(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _textController,
+                            onSubmitted: (_) => _sendText(),
+                            decoration: InputDecoration(
+                              fillColor: Colors.white,
+                              filled: true,
+                              hintText: '输入消息...',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline, size: 28, color: Colors.black87),
+                          onPressed: _pickAndSendFile,
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF07C160),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          ),
+                          onPressed: _sendText,
+                          child: const Text('发送'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          Container(
-            color: const Color(0xFFF7F7F7),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      onSubmitted: (_) => _sendText(),
-                      decoration: InputDecoration(
-                        fillColor: Colors.white,
-                        filled: true,
-                        hintText: '输入消息...',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+            if (_isDragging)
+              Positioned.fill(
+                child: Container(
+                  color: const Color(0xCC07C160),
+                  alignment: Alignment.center,
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.file_upload_outlined, size: 64, color: Colors.white),
+                      SizedBox(height: 12),
+                      Text(
+                        '松开鼠标立即发送文件',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline, size: 28, color: Colors.black87),
-                    onPressed: _pickAndSendFile,
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF07C160),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    ),
-                    onPressed: _sendText,
-                    child: const Text('发送'),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
-}
+
 class _ChatImageBubble extends StatefulWidget {
   final Uint8List? imageBytes;
   final String? filePath;
