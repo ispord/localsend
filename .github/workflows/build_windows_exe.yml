@@ -1,8 +1,5 @@
-
-name: Build windows exe
           & 'C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe' pack /o /d support\build\msix\content /nv /p app\windows\localsend_msix_helper.msix
 
-      # MSIX helper is packaged without a signature.
       - name: Dependencies
         working-directory: app
         run: flutter pub get
@@ -19,12 +16,13 @@ name: Build windows exe
           Copy-Item -Path "support\build\windows\x64\*" -Destination "${{ runner.temp }}\inno" -Recurse
           New-Item -ItemType Directory -Force -Path "${{ runner.temp }}\inno-result" | Out-Null
 
-            - name: Compile installer (unsigned)
+      - name: Compile installer (unsigned)
         run: iscc "/DPayloadDir=${{ runner.temp }}\inno" "/DResultDir=${{ runner.temp }}\inno-result" support\scripts\compile_windows_exe-inno.iss
+
       - name: Rename installer
         run: Rename-Item -Path "${{ runner.temp }}\inno-result\localsend.exe" -NewName "LocalSend-${{ needs.build.outputs.version }}-windows-x86-64.exe"
 
-      - name: Upload unsigned installer
+      - name: Upload installer
         uses: actions/upload-artifact@v6
         with:
           name: windows-exe-x86-64-result
