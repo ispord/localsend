@@ -95,23 +95,32 @@ jobs:
           sed -i 's/?trailing/trailing!/g' lib/widget/list_tile/custom_list_tile.dart || true
           sed -i 's/?prefix/prefix!/g' lib/widget/copyable_text.dart || true
 
-      # 👇 补丁 3：直接用 Java 进程调用替换掉旧的 exec 闭包 👇
+      # 👇 补丁 3：用 Python 精准修复 cargokit 的 Gradle 语法问题 👇
       - name: Patch cargokit gradle
         run: |
-          FILE="${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
-          if [ -f "$FILE" ]; then
-            echo "Found plugin.gradle at $FILE"
-            # 我们直接把 63 行附近的 exec 相关的代码替换为 Java 原生 ProcessBuilder
-            # 这种方法避开了所有闭包嵌套的解析问题
-            sed -i '/exec {/,/^        }/c\
-            def pb = new ProcessBuilder()\
-            pb.command(commandLine)\
-            pb.directory(workingDir)\
-            def proc = pb.start()\
-            proc.waitFor()' "$FILE"
-          else
-            echo "plugin.gradle not found!"
-          fi
+          python3 -c '
+          import re
+          filepath = "${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
+          with open(filepath, "r") as f:
+              content = f.read()
+          
+          # 查找原本的 exec 闭包并替换成 Java 原生 ProcessBuilder 执行方式
+          # 这样无论它怎么嵌套，都不会破坏文件的语法结构
+          pattern = re.compile(r"project\.exec\s*\{([\s\S]*?)\}")
+          def replacer(match):
+              inner = match.group(1)
+              # 提取 commandLine 和 workingDir
+              cmd_match = re.search(r"commandLine\s+(.*)", inner)
+              dir_match = re.search(r"workingDir\s+(.*)", inner)
+              cmd = cmd_match.group(1) if cmd_match else "[]"
+              workdir = dir_match.group(1) if dir_match else "project.rootDir"
+              return f"def pb = new ProcessBuilder({cmd})\npb.directory({workdir})\ndef proc = pb.start()\nproc.waitFor()"
+          
+          new_content = pattern.sub(replacer, content)
+          with open(filepath, "w") as f:
+              f.write(new_content)
+          print("Successfully patched cargokit plugin.gradle")
+          '
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
