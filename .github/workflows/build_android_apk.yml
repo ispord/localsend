@@ -67,7 +67,7 @@ jobs:
         working-directory: ${{ env.APK_BUILD_DIR }}
         run: flutter pub get
 
-      # 👇 补丁 1：修复第三方老旧库 device_apps 的 Gradle 问题 👇
+      # 👇 补丁 1：修复 device_apps 的 Gradle 问题 👇
       - name: Patch device_apps gradle
         run: |
           DEVICE_APPS_DIR=$(find ~/.pub-cache/git -type d -name "device_apps-*" | head -n 1)
@@ -77,50 +77,32 @@ jobs:
             sed -i '1i apply plugin: "com.android.library"' "$DEVICE_APPS_DIR/android/build.gradle"
           fi
 
-      # 👇 补丁 2：自动修复源码中不兼容新版 Flutter/Dart 的语法错误 👇
+      # 👇 补丁 2：自动修复源码中的语法错误 👇
       - name: Patch Dart code errors
         working-directory: ${{ env.APK_BUILD_DIR }}/app
         run: |
-          echo "Fixing FilePicker APIs..."
           sed -i 's/FilePicker.clearTemporaryFiles()/FilePicker.platform.clearTemporaryFiles()/g' lib/util/native/cache_helper.dart || true
           sed -i 's/FilePicker.pickFiles/FilePicker.platform.pickFiles/g' lib/pages/wechat_room_page.dart || true
           sed -i 's/FilePicker.getDirectoryPath()/FilePicker.platform.getDirectoryPath()/g' lib/util/native/pick_directory_path.dart || true
-
-          echo "Fixing wildcard '_' conflicts..."
           sed -i 's/(_, _)/(context, index)/g' lib/pages/tabs/send_tab.dart || true
           sed -i 's/onPopInvokedWithResult: (_, _)/onPopInvokedWithResult: (bool didPop, Object? result)/g' lib/pages/web_share_page.dart || true
           sed -i 's/(_, _, _)/(context, error, stackTrace)/g' lib/widget/file_thumbnail.dart || true
-
-          echo "Fixing null-aware elements..."
           sed -i 's/?trailing/trailing!/g' lib/widget/list_tile/custom_list_tile.dart || true
           sed -i 's/?prefix/prefix!/g' lib/widget/copyable_text.dart || true
 
-      # 👇 补丁 3：用 Python 精准修复 cargokit 的 Gradle 语法问题 👇
+      # 👇 补丁 3：完美注入 ExecOperations，解决 Gradle 9 报错 👇
       - name: Patch cargokit gradle
         run: |
-          python3 -c '
-          import re
-          filepath = "${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
-          with open(filepath, "r") as f:
-              content = f.read()
-          
-          # 查找原本的 exec 闭包并替换成 Java 原生 ProcessBuilder 执行方式
-          # 这样无论它怎么嵌套，都不会破坏文件的语法结构
-          pattern = re.compile(r"project\.exec\s*\{([\s\S]*?)\}")
-          def replacer(match):
-              inner = match.group(1)
-              # 提取 commandLine 和 workingDir
-              cmd_match = re.search(r"commandLine\s+(.*)", inner)
-              dir_match = re.search(r"workingDir\s+(.*)", inner)
-              cmd = cmd_match.group(1) if cmd_match else "[]"
-              workdir = dir_match.group(1) if dir_match else "project.rootDir"
-              return f"def pb = new ProcessBuilder({cmd})\npb.directory({workdir})\ndef proc = pb.start()\nproc.waitFor()"
-          
-          new_content = pattern.sub(replacer, content)
-          with open(filepath, "w") as f:
-              f.write(new_content)
-          print("Successfully patched cargokit plugin.gradle")
-          '
+          FILE="${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
+          if [ -f "$FILE" ]; then
+            # 1. 在 CargoKitBuildTask 类里注入 ExecOperations
+            sed -i 's/abstract class CargoKitBuildTask extends DefaultTask {/abstract class CargoKitBuildTask extends DefaultTask {\n    @javax.inject.Inject abstract org.gradle.process.ExecOperations getExecOperations()/' "$FILE"
+            
+            # 2. 将 project.exec 替换为 execOperations.exec (保留内部所有代码不动)
+            sed -i 's/project.exec {/execOperations.exec {/g' "$FILE"
+            
+            echo "Patched cargokit gradle successfully!"
+          fi
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
