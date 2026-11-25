@@ -95,24 +95,26 @@ jobs:
           sed -i 's/?trailing/trailing!/g' lib/widget/list_tile/custom_list_tile.dart || true
           sed -i 's/?prefix/prefix!/g' lib/widget/copyable_text.dart || true
 
-      # 👇 补丁 3：修复 Rust 构建工具 cargokit 兼容 Gradle 9 的问题（放弃 execOperations，改用兼容写法） 👇
+      # 👇 补丁 3：直接用 Java 进程调用替换掉旧的 exec 闭包 👇
       - name: Patch cargokit gradle
         run: |
-          # 找到 cargokit 的 plugin.gradle，将废弃的 exec 替换为 Java 原生 Process 调用
-          find ${{ env.APK_BUILD_DIR }} -type f -name "plugin.gradle" -path "*cargokit*" | while read file; do
-            echo "Patching $file"
-            # 替换掉 project.exec {} 的闭包调用
-            sed -i 's/project.exec {/def proc = new ProcessBuilder(/' "$file"
-            sed -i 's/commandLine /proc.command(/' "$file"
-            sed -i 's/}/proc.start().waitFor(); }/' "$file"
-          done
-          
-          # 为了避开 Gradle 9 对旧 API 的严格检查，我们在执行前全局忽略 Gradle 版本检查
-          echo "org.gradle.warning.mode=none" >> gradle.properties
+          FILE="${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
+          if [ -f "$FILE" ]; then
+            echo "Found plugin.gradle at $FILE"
+            # 我们直接把 63 行附近的 exec 相关的代码替换为 Java 原生 ProcessBuilder
+            # 这种方法避开了所有闭包嵌套的解析问题
+            sed -i '/exec {/,/^        }/c\
+            def pb = new ProcessBuilder()\
+            pb.command(commandLine)\
+            pb.directory(workingDir)\
+            def proc = pb.start()\
+            proc.waitFor()' "$FILE"
+          else
+            echo "plugin.gradle not found!"
+          fi
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
-        # 加上跳过校验的参数
         run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Upload APK
