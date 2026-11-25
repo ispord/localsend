@@ -3,6 +3,12 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
+# 👇 新增：阻止并发的构建堆积（如果连续触发，自动取消旧的，只跑最新的） 👇
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+# 👆 -------------------------------------------------------------------- 👆
+
 env:
   FLUTTER_VERSION: "3.50.0"
   APK_BUILD_DIR: "/tmp/build"
@@ -90,17 +96,13 @@ jobs:
           sed -i 's/?trailing/trailing!/g' lib/widget/list_tile/custom_list_tile.dart || true
           sed -i 's/?prefix/prefix!/g' lib/widget/copyable_text.dart || true
 
-      # 👇 补丁 3：完美注入 ExecOperations，解决 Gradle 9 报错 👇
+      # 👇 补丁 3：完美替换 cargokit 官方脚本（解决 Gradle 9 冲突） 👇
       - name: Patch cargokit gradle
         run: |
           FILE="${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
           if [ -f "$FILE" ]; then
-            # 1. 在 CargoKitBuildTask 类里注入 ExecOperations
-            sed -i 's/abstract class CargoKitBuildTask extends DefaultTask {/abstract class CargoKitBuildTask extends DefaultTask {\n    @javax.inject.Inject abstract org.gradle.process.ExecOperations getExecOperations()/' "$FILE"
-            
-            # 2. 将 project.exec 替换为 execOperations.exec (保留内部所有代码不动)
-            sed -i 's/project.exec {/execOperations.exec {/g' "$FILE"
-            
+            echo "Found cargokit at: $FILE"
+            curl -sL "https://raw.githubusercontent.com/irondash/cargokit/main/gradle/plugin.gradle" -o "$FILE"
             echo "Patched cargokit gradle successfully!"
           fi
 
