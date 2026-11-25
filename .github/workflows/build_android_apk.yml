@@ -73,6 +73,15 @@ jobs:
         working-directory: ${{ env.APK_BUILD_DIR }}
         run: flutter pub get
 
+      # 👇 核心操作：将 Gradle 降级回 8.14.7，彻底绕过 cargokit 的 project.exec 报错 👇
+      - name: Downgrade Gradle to 8.14.7 for cargokit compatibility
+        run: |
+          GRADLE_FILE="${{ env.APK_BUILD_DIR }}/app/android/gradle/wrapper/gradle-wrapper.properties"
+          if [ -f "$GRADLE_FILE" ]; then
+            sed -i 's/gradle-9.3.1-all.zip/gradle-8.14.7-all.zip/g' "$GRADLE_FILE"
+            echo "Gradle downgraded to 8.14.7."
+          fi
+
       # 👇 补丁 1：修复 device_apps 的 Gradle 问题 👇
       - name: Patch device_apps gradle
         run: |
@@ -96,16 +105,7 @@ jobs:
           sed -i 's/?trailing/trailing!/g' lib/widget/list_tile/custom_list_tile.dart || true
           sed -i 's/?prefix/prefix!/g' lib/widget/copyable_text.dart || true
 
-      # 👇 补丁 3：完美替换 cargokit 官方脚本（解决 Gradle 9 冲突） 👇
-      - name: Patch cargokit gradle
-        run: |
-          FILE="${{ env.APK_BUILD_DIR }}/packages/localsend_isolates/rust_builder/cargokit/gradle/plugin.gradle"
-          if [ -f "$FILE" ]; then
-            echo "Found cargokit at: $FILE"
-            curl -sL "https://raw.githubusercontent.com/irondash/cargokit/main/gradle/plugin.gradle" -o "$FILE"
-            echo "Patched cargokit gradle successfully!"
-          fi
-
+      # 👇 开始构建（依靠 --android-skip-build-dependency-validation 忽略降级警告） 👇
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
         run: flutter build apk --release --android-skip-build-dependency-validation
